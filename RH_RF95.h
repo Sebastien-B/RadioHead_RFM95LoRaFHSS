@@ -13,6 +13,41 @@
 #define RH_RF95_h
 
 #define DEBUG_RF95_ENABLE_PRINT_STATEMENTS false
+#define DEBUG_ENABLE_DEBUG_GPIO            true
+// Suitable pins for use with Adafruit Feather RFM95.
+#define DEBUG_GPIO_1 14
+#define DEBUG_GPIO_2 15
+#define DEBUG_GPIO_3 16
+
+// Sets the provided GPIO pin high when RH_RF95::send is running.
+// Set to debug GPIO to enable, 0 to disable.
+#define DEBUG_RFM95_SEND     DEBUG_GPIO_1
+#if DEBUG_RFM95_SEND \
+    && !(DEBUG_RFM95_SEND == DEBUG_GPIO_1 \
+         || DEBUG_RFM95_SEND == DEBUG_GPIO_2 \
+         || DEBUG_RFM95_SEND == DEBUG_GPIO_3)
+#error "Invalid setting for DEBUG_RFM95_SEND."
+#endif // DEBUG_RFM95_SEND
+
+// Sets the provided GPIO pin high when RH_RF95::recv is running.
+// Set to debug GPIO to enable, 0 to disable.
+#define DEBUG_RFM95_RECV     DEBUG_GPIO_2
+#if DEBUG_RFM95_RECV \
+    && !(DEBUG_RFM95_RECV == DEBUG_GPIO_1 \
+         || DEBUG_RFM95_RECV == DEBUG_GPIO_2 \
+         || DEBUG_RFM95_RECV == DEBUG_GPIO_3)
+#error "Invalid setting for DEBUG_RFM95_RECV."
+#endif // DEBUG_RFM95_RECV
+
+// Sets the provided GPIO pin high when the RH_RF95_FHSS_CHANGE_CHANNEL IRQ flag is being serviced.
+// Set to debug GPIO to enable, 0 to disable.
+#define DEBUG_RFM95_FREQ_HOP DEBUG_GPIO_3
+#if DEBUG_RFM95_FREQ_HOP \
+    && !(DEBUG_RFM95_FREQ_HOP == DEBUG_GPIO_1 \
+         || DEBUG_RFM95_FREQ_HOP == DEBUG_GPIO_2 \
+         || DEBUG_RFM95_FREQ_HOP == DEBUG_GPIO_3)
+#error "Invalid setting for DEBUG_RFM95_FREQ_HOP."
+#endif // DEBUG_RFM95_FREQ_HOP
 
 #include <RHSPIDriver.h>
 

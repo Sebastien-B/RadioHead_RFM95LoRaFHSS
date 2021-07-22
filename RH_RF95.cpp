@@ -42,6 +42,15 @@ RH_RF95::RH_RF95(uint8_t slaveSelectPin, uint8_t interruptPin, RHGenericSPI& spi
 
 bool RH_RF95::init()
 {
+    #if DEBUG_ENABLE_DEBUG_GPIO
+    pinMode(DEBUG_GPIO_1, OUTPUT);
+    pinMode(DEBUG_GPIO_2, OUTPUT);
+    pinMode(DEBUG_GPIO_3, OUTPUT);
+    digitalWrite(DEBUG_GPIO_1, LOW);
+    digitalWrite(DEBUG_GPIO_2, LOW);
+    digitalWrite(DEBUG_GPIO_3, LOW);
+    #endif // DEBUG_ENABLE_DEBUG_GPIO
+    
     if (!RHSPIDriver::init())
 	return false;
 
@@ -254,15 +263,21 @@ void RH_RF95::handleInterrupt()
 
     if (irq_flags & RH_RF95_FHSS_CHANGE_CHANNEL)
     {
-    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
-	Serial.println("F: ");
-    Serial.println(getFreqHoppingChannel(), DEC);
-    #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
-    float freqToSet = _frequencyChannelTable[random(0,NUM_FREQ_CHANNELS)];
-    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
-    Serial.println(freqToSet);
-    #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
-    setFrequency(freqToSet);
+        #if DEBUG_RFM95_FREQ_HOP
+        digitalWrite(DEBUG_RFM95_FREQ_HOP, HIGH);
+        #endif // DEBUG_RFM95_FREQ_HOP
+        #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+	    Serial.println("F: ");
+        Serial.println(getFreqHoppingChannel(), DEC);
+        #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+        float freqToSet = _frequencyChannelTable[random(0,NUM_FREQ_CHANNELS)];
+        #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+        Serial.println(freqToSet);
+        #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+        setFrequency(freqToSet);
+        #if DEBUG_RFM95_FREQ_HOP
+        digitalWrite(DEBUG_RFM95_FREQ_HOP, LOW);
+        #endif // DEBUG_RFM95_FREQ_HOP
     }
     
 	
@@ -334,34 +349,58 @@ void RH_RF95::clearRxBuf()
 
 bool RH_RF95::recv(uint8_t* buf, uint8_t* len)
 {
+    #if DEBUG_RFM95_RECV
+    digitalWrite(DEBUG_RFM95_RECV, HIGH);
+    #endif // DEBUG_RFM95_RECV
     if (!available())
-	return false;
+    {
+      #if DEBUG_RFM95_RECV
+      digitalWrite(DEBUG_RFM95_RECV, LOW);
+      #endif // DEBUG_RFM95_RECV
+	  return false;
+    }
     RH_MUTEX_LOCK(lock); // Multithread support
     if (buf && len)
     {
-	ATOMIC_BLOCK_START;
-	// Skip the 4 headers that are at the beginning of the rxBuf
-	if (*len > _bufLen-RH_RF95_HEADER_LEN)
-	    *len = _bufLen-RH_RF95_HEADER_LEN;
-	memcpy(buf, _buf+RH_RF95_HEADER_LEN, *len);
-	ATOMIC_BLOCK_END;
+	    ATOMIC_BLOCK_START;
+	    // Skip the 4 headers that are at the beginning of the rxBuf
+	    if (*len > _bufLen-RH_RF95_HEADER_LEN)
+	    {
+            *len = _bufLen-RH_RF95_HEADER_LEN;
+        }
+        memcpy(buf, _buf+RH_RF95_HEADER_LEN, *len);
+        ATOMIC_BLOCK_END;
     }
     clearRxBuf(); // This message accepted and cleared
     RH_MUTEX_UNLOCK(lock);
+    #if DEBUG_RFM95_RECV
+    digitalWrite(DEBUG_RFM95_RECV, LOW);
+    #endif // DEBUG_RFM95_RECV
     return true;
 }
 
 bool RH_RF95::send(const uint8_t* data, uint8_t len)
 {
+    #if DEBUG_RFM95_SEND
+    digitalWrite(DEBUG_RFM95_SEND, HIGH);
+    #endif // DEBUG_RFM95_SEND
     if (len > RH_RF95_MAX_MESSAGE_LEN)
-	return false;
-
+	{
+        #if DEBUG_RFM95_SEND
+        digitalWrite(DEBUG_RFM95_SEND, LOW);
+        #endif // DEBUG_RFM95_SEND
+        return false;
+    }
     waitPacketSent(); // Make sure we dont interrupt an outgoing message
     setModeIdle();
 
-    if (!waitCAD()) 
-	return false;  // Check channel activity
-
+    if (!waitCAD())
+    {
+	    #if DEBUG_RFM95_SEND
+        digitalWrite(DEBUG_RFM95_SEND, LOW);
+        #endif // DEBUG_RFM95_SEND
+        return false;  // Check channel activity
+    }
     // Position at the beginning of the FIFO
     spiWrite(RH_RF95_REG_0D_FIFO_ADDR_PTR, 0);
     // The headers
@@ -378,6 +417,9 @@ bool RH_RF95::send(const uint8_t* data, uint8_t len)
     RH_MUTEX_UNLOCK(lock);
     
     // when Tx is done, interruptHandler will fire and radio mode will return to STANDBY
+    #if DEBUG_RFM95_SEND
+    digitalWrite(DEBUG_RFM95_SEND, LOW);
+    #endif // DEBUG_RFM95_SEND
     return true;
 }
 
