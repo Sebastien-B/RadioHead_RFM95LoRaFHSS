@@ -149,7 +149,6 @@ bool RH_RF95::init()
 void RH_RF95::handleInterrupt()
 {
     RH_MUTEX_LOCK(lock); // Multithreading support
-    
     // we need the RF95 IRQ to be level triggered, or we ……have slim chance of missing events
     // https://github.com/geeksville/Meshtastic-esp32/commit/78470ed3f59f5c84fbd1325bcff1fd95b2b20183
 
@@ -158,10 +157,12 @@ void RH_RF95::handleInterrupt()
     // Read the RegHopChannel register to check if CRC presence is signalled
     // in the header. If not it might be a stray (noise) packet.*
     uint8_t hop_channel = spiRead(RH_RF95_REG_1C_HOP_CHANNEL);
-//    Serial.println(irq_flags, HEX);
-//    Serial.println(_mode, HEX);
-//    Serial.println(hop_channel, HEX);
-//    Serial.println(_enableCRC, HEX);
+    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    Serial.println(irq_flags, HEX);
+    Serial.println(_mode, HEX);
+    Serial.println(hop_channel, HEX);
+    Serial.println(_enableCRC, HEX);
+    #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
 
     // ack all interrupts, 
     // Sigh: on some processors, for some unknown reason, doing this only once does not actually
@@ -183,7 +184,9 @@ void RH_RF95::handleInterrupt()
 	    || (_enableCRC && !(hop_channel & RH_RF95_RX_PAYLOAD_CRC_IS_ON)) ))
 //    if (_mode == RHModeRx && irq_flags & (RH_RF95_RX_TIMEOUT | RH_RF95_PAYLOAD_CRC_ERROR))
     {
-//	Serial.println("E");
+    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+	Serial.println("E");
+    #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
 	_rxBad++;
         clearRxBuf();
     }
@@ -192,7 +195,9 @@ void RH_RF95::handleInterrupt()
     else if (_mode == RHModeRx && irq_flags & RH_RF95_RX_DONE)
     {
 	// Packet received, no CRC error
-//	Serial.println("R");
+    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+	Serial.println("R");
+    #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
 	// Have received a packet
 	uint8_t len = spiRead(RH_RF95_REG_13_RX_NB_BYTES);
 
@@ -226,20 +231,40 @@ void RH_RF95::handleInterrupt()
     }
     else if (_mode == RHModeTx && irq_flags & RH_RF95_TX_DONE)
     {
-//	Serial.println("T");
+    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+	Serial.println("T");
+    #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
 	_txGood++;
 	setModeIdle();
     }
     else if (_mode == RHModeCad && irq_flags & RH_RF95_CAD_DONE)
     {
-//	Serial.println("C");
+    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+	Serial.println("C");
         _cad = irq_flags & RH_RF95_CAD_DETECTED;
         setModeIdle();
+    #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
     }
     else
     {
-//	Serial.println("?");
+    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+	Serial.println("?");
+    #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
     }
+
+    if (irq_flags & RH_RF95_FHSS_CHANGE_CHANNEL)
+    {
+    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+	Serial.println("F: ");
+    Serial.println(getFreqHoppingChannel(), DEC);
+    #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    float freqToSet = _frequencyChannelTable[random(0,NUM_FREQ_CHANNELS)];
+    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    Serial.println(freqToSet);
+    #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    setFrequency(freqToSet);
+    }
+    
 	
     // Sigh: on some processors, for some unknown reason, doing this only once does not actually
     // clear the radio's interrupt flag. So we do it twice. Why?
@@ -708,3 +733,17 @@ uint8_t RH_RF95::getDeviceVersion()
 	return _deviceVersion;
 }
 
+void RH_RF95::setFreqHoppingPeriod(uint8_t period)
+{
+    if (period != 0)
+    {
+      // Initialize RNG for channel hopping
+      randomSeed(RH_RF95_FHSS_SEED);
+    }
+    spiWrite(RH_RF95_REG_24_HOP_PERIOD, period);
+}
+
+uint8_t RH_RF95::getFreqHoppingChannel()
+{
+    return (spiRead(RH_RF95_REG_1C_HOP_CHANNEL) & RH_RF95_FHSS_PRESENT_CHANNEL);
+}

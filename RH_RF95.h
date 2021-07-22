@@ -12,7 +12,16 @@
 #ifndef RH_RF95_h
 #define RH_RF95_h
 
+#define DEBUG_RF95_ENABLE_PRINT_STATEMENTS false
+
 #include <RHSPIDriver.h>
+
+// Pseudo-random RNG seed used to generate channel hopping sequence
+// Should be the same across all units using FHSS operation.
+#define RH_RF95_FHSS_SEED 380
+
+// Number of available frequency channels.
+#define NUM_FREQ_CHANNELS 16
 
 // This is the maximum number of interrupts the driver can support
 // Most Arduinos can handle 2, Megas can handle more
@@ -848,6 +857,14 @@ public:
     /// \param none
     /// \return uint8_t deviceID
     uint8_t getDeviceVersion();
+
+	// Enable frequency hopping spread spectrum mode and set the number of symbol period between hops.
+	// Setting period to 0 disables frequency hopping.
+	// Call this immediately after init(). 
+	void setFreqHoppingPeriod(uint8_t period = 0);
+
+	// Get the current value of the frequency hopping channel in use.
+	uint8_t getFreqHoppingChannel();
     
 protected:
     /// This is a low level function to handle the interrupts for one instance of RH_RF95.
@@ -855,7 +872,7 @@ protected:
     /// Should not need to be called by user code.
     void           handleInterrupt();
 
-    /// Examine the revceive buffer to determine whether the message is for this node
+    ///		 Examine the revceive buffer to determine whether the message is for this node
     void validateRxBuf();
 
     /// Clear our local receive buffer
@@ -866,7 +883,7 @@ protected:
     /// \param[in] mode RHMode the new mode about to take effect
     /// \return true if the subclasses changes successful
     virtual bool modeWillChange(RHMode) {return true;}
-    
+
     /// False if the PA_BOOST transmitter output pin is to be used.
     /// True if the RFO transmitter output pin is to be used.
     bool                _useRFO;
@@ -914,7 +931,24 @@ private:
 
     /// device ID
     uint8_t		_deviceVersion = 0x00;
-    
+
+    /// Table of usable frequency channel tables
+    float _frequencyChannelTable [NUM_FREQ_CHANNELS] = {903.0,
+                                             904.6,
+                                             906.2,
+                                             907.8,
+                                             909.4,
+                                             911.0,
+                                             912.6,
+                                             914.2,
+                                             923.3,
+                                             923.9,
+                                             924.5,
+                                             925.1,
+                                             925.7,
+                                             926.3,
+                                             926.9,
+                                             927.5};
 };
 
 /// @example rf95_client.pde
