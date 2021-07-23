@@ -170,7 +170,7 @@ void RH_RF95::handleInterrupt()
     // Read the RegHopChannel register to check if CRC presence is signalled
     // in the header. If not it might be a stray (noise) packet.*
     uint8_t hop_channel = spiRead(RH_RF95_REG_1C_HOP_CHANNEL);
-    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    #if (DEBUG_RF95_ENABLE_PRINT_STATEMENTS > 1)
     Serial.println(irq_flags, HEX);
     Serial.println(_mode, HEX);
     Serial.println(hop_channel, HEX);
@@ -197,7 +197,7 @@ void RH_RF95::handleInterrupt()
 	    || (_enableCRC && !(hop_channel & RH_RF95_RX_PAYLOAD_CRC_IS_ON)) ))
 //    if (_mode == RHModeRx && irq_flags & (RH_RF95_RX_TIMEOUT | RH_RF95_PAYLOAD_CRC_ERROR))
     {
-    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    #if (DEBUG_RF95_ENABLE_PRINT_STATEMENTS > 1)
 	Serial.println("E");
     #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
 	_rxBad++;
@@ -208,7 +208,7 @@ void RH_RF95::handleInterrupt()
     else if (_mode == RHModeRx && irq_flags & RH_RF95_RX_DONE)
     {
 	// Packet received, no CRC error
-    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    #if (DEBUG_RF95_ENABLE_PRINT_STATEMENTS > 1)
 	Serial.println("R");
     #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
 	// Have received a packet
@@ -244,7 +244,7 @@ void RH_RF95::handleInterrupt()
     }
     else if (_mode == RHModeTx && irq_flags & RH_RF95_TX_DONE)
     {
-    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    #if (DEBUG_RF95_ENABLE_PRINT_STATEMENTS > 1)
 	Serial.println("T");
     #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
 	_txGood++;
@@ -252,7 +252,7 @@ void RH_RF95::handleInterrupt()
     }
     else if (_mode == RHModeCad && irq_flags & RH_RF95_CAD_DONE)
     {
-    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    #if (DEBUG_RF95_ENABLE_PRINT_STATEMENTS > 1)
 	Serial.println("C");
         _cad = irq_flags & RH_RF95_CAD_DETECTED;
         setModeIdle();
@@ -260,7 +260,7 @@ void RH_RF95::handleInterrupt()
     }
     else
     {
-    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    #if (DEBUG_RF95_ENABLE_PRINT_STATEMENTS > 1)
 	Serial.println("?");
     #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
     }
@@ -813,14 +813,14 @@ void RH_RF95::setRandomFrequency()
     #if DEBUG_RFM95_FREQ_HOP
     digitalWrite(DEBUG_RFM95_FREQ_HOP, HIGH);
     #endif // DEBUG_RFM95_FREQ_HOP
-    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    #if (DEBUG_RF95_ENABLE_PRINT_STATEMENTS > 0)
 	Serial.println("F: ");
     #if (ENABLE_RF95_FHSS == 1)
     Serial.println(getFreqHoppingChannel(), DEC);
     #endif // ENABLE_RF95_FHSS
     #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
     float freqToSet = _frequencyChannelTable[random(0,NUM_FREQ_CHANNELS)];
-    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    #if (DEBUG_RF95_ENABLE_PRINT_STATEMENTS > 0)
     Serial.println(freqToSet);
     #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
     setFrequency(freqToSet);
@@ -850,7 +850,7 @@ uint8_t RH_RF95::getFreqHoppingChannel()
 
 #if (ENABLE_RF95_FHSS == 3)
 // Advance through a repeating, randomized, 16-channel sequence.
-void RH_RF95::advanceFrequencySequence(bool reset, uint32_t timeout)
+bool RH_RF95::advanceFrequencySequence(bool reset, uint32_t timeout)
 {
     static uint32_t currentMillis;
     static uint32_t freqChangeMillis;
@@ -867,7 +867,7 @@ void RH_RF95::advanceFrequencySequence(bool reset, uint32_t timeout)
         #if DEBUG_RFM95_FREQ_HOP
         digitalWrite(DEBUG_RFM95_FREQ_HOP, HIGH);
         #endif // DEBUG_RFM95_FREQ_HOP
-        #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+        #if (DEBUG_RF95_ENABLE_PRINT_STATEMENTS > 0)
 	    Serial.println("F: ");
         #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
         float freqToSet = _frequencyChannelTable[_randomChannelSequence[i]];
@@ -876,7 +876,7 @@ void RH_RF95::advanceFrequencySequence(bool reset, uint32_t timeout)
         {
             i = 0;
         }
-        #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+        #if (DEBUG_RF95_ENABLE_PRINT_STATEMENTS > 0)
         Serial.println(freqToSet);
         #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
         setFrequency(freqToSet);
@@ -884,7 +884,9 @@ void RH_RF95::advanceFrequencySequence(bool reset, uint32_t timeout)
         #if DEBUG_RFM95_FREQ_HOP
         digitalWrite(DEBUG_RFM95_FREQ_HOP, LOW);
         #endif // DEBUG_RFM95_FREQ_HOP
+        return true;
     }
+    return false;
 }
 
 

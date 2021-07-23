@@ -53,9 +53,11 @@
 // unit will hear at least one, or reserve one frequency for joining.
 // In practice, recieving and transmitting must be precisely synchronized for
 // this approach to work - though it seems simple in theory.
-#define ENABLE_RF95_FHSS 0
+#define ENABLE_RF95_FHSS 3
 
-#define DEBUG_RF95_ENABLE_PRINT_STATEMENTS false
+// 1. Print on frequency change only.
+// >1. Print all.
+#define DEBUG_RF95_ENABLE_PRINT_STATEMENTS 1
 #define DEBUG_ENABLE_DEBUG_GPIO            true
 // Suitable pins for use with Adafruit Feather RFM95.
 #define DEBUG_GPIO_1 14
@@ -971,7 +973,7 @@ public:
 
     #if (ENABLE_RF95_FHSS == 3)
     // Advance through a repeating, randomized, 16-channel sequence.
-    void advanceFrequencySequence(bool reset, uint32_t timeout);
+    bool advanceFrequencySequence(bool reset, uint32_t timeout);
     #endif // ENABLE_RF95_FHSS
     
     ///////////////////////////////////////////////////
