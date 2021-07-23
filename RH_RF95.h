@@ -12,6 +12,17 @@
 #ifndef RH_RF95_h
 #define RH_RF95_h
 
+///////////////////////////////////////////////////
+ //
+ // additions below by Sophie Bernier 22nd Jul 2021
+ // raptoronabicycle@gmail.com
+ //
+ // Experimental frequency hopping support:
+ // Here be dragons!
+ //
+ ///////////////////////////////////////////////////
+
+// FHSS (Frequency Hopping Spread Spectrum) testing:
 // Values:
 // 0. FHSS Disabled.
 // 1. Basic FHSS support: Whenever the interrupts service
@@ -21,9 +32,28 @@
 // hopping change channel flag.  If this flag is set, we
 // generate a pseudo random number from a fixed seed, serving as
 // the index to the table of frequencies available.
-#define ENABLE_RF95_FHSS 1
+// 2. CSMA (Carrier Sense Multi. Access) test: Performs a
+// CAD (Channel Activity Detect) on all channels during a recieve
+// operation and recieves on that channel if the CAD detects
+// activity. Transmits on a random frequency as chosen in option 1.
+// This does not actually allow the receiver to work, and requires further
+// refinement and troubleshooting.
+// 3. DSSS (Direct Sequence Spread Spectrum): Enable the
+// advanceFrequencySequence function to allow the user to step through the
+// list of available frequencies in a random and repeating pattern. Units
+// on the network must always remain in lock-step, on the same frequency,
+// changing their frequencies at the exact same time.
+// If timing drift between the two units is significant, the user could
+// reset this process periodically. Additionally, there must be some kind of
+// join procedure to ensure that the two units are on the same frequency.
+// Either start frequency hopping right away, and have one unit transmit a
+// synchronization signal over all frequencies, ensuring that the other
+// unit will hear at least one, or reserve one frequency for joining.
+// In practice, recieving and transmitting must be precisely synchronized for
+// this approach to work - though it seems simple in theory.
+#define ENABLE_RF95_FHSS 3
 
-#define DEBUG_RF95_ENABLE_PRINT_STATEMENTS false
+#define DEBUG_RF95_ENABLE_PRINT_STATEMENTS true
 #define DEBUG_ENABLE_DEBUG_GPIO            true
 // Suitable pins for use with Adafruit Feather RFM95.
 #define DEBUG_GPIO_1 14
@@ -61,6 +91,12 @@
 #error "Invalid setting for DEBUG_RFM95_FREQ_HOP."
 #endif // DEBUG_RFM95_FREQ_HOP
 #endif // ENABLE_RF95_FHSS
+
+///////////////////////////////////////////////////
+ //
+ // end of additions by Sophie Bernier
+ //
+ ///////////////////////////////////////////////////
 
 #include <RHSPIDriver.h>
 
@@ -908,16 +944,42 @@ public:
     /// \return uint8_t deviceID
     uint8_t getDeviceVersion();
 
+    ///////////////////////////////////////////////////
+     //
+     // additions below by Sophie Bernier 22nd Jul 2021
+     // raptoronabicycle@gmail.com
+     //
+     // Experimental frequency hopping support:
+     // Here be dragons!
+     //
+     ///////////////////////////////////////////////////
+
+    #if (ENABLE_RF95_FHSS > 0)
+    /// Set the rx and tx frequency to a random channel.
+    void setRandomFrequency();
+    #endif // ENABLE_RF95_FHSS
+
     #if (ENABLE_RF95_FHSS == 1)
-	// Enable frequency hopping spread spectrum mode and set the number of symbol period between hops.
-	// Setting period to 0 disables frequency hopping.
-	// Call this immediately after init(). 
+	/// Enable frequency hopping spread spectrum mode and set the number of symbol period between hops.
+	/// Setting period to 0 disables frequency hopping.
+	/// Call this immediately after init(). 
 	void setFreqHoppingPeriod(uint8_t period = 0);
 
-	// Get the current value of the frequency hopping channel in use.
+	/// Get the current value of the frequency hopping channel in use.
 	uint8_t getFreqHoppingChannel();
     #endif // ENABLE_RF95_FHSS
+
+    #if (ENABLE_RF95_FHSS == 3)
+    // Advance through a repeating, randomized, 16-channel sequence.
+    void advanceFrequencySequence(bool reset, uint32_t timeout);
+    #endif // ENABLE_RF95_FHSS
     
+    ///////////////////////////////////////////////////
+     //
+     // end of additions by Sophie Bernier
+     //
+     ///////////////////////////////////////////////////
+
 protected:
     /// This is a low level function to handle the interrupts for one instance of RH_RF95.
     /// Called automatically by isr*()
@@ -984,25 +1046,33 @@ private:
     /// device ID
     uint8_t		_deviceVersion = 0x00;
 
+    ///////////////////////////////////////////////////
+     //
+     // additions below by Sophie Bernier 22nd Jul 2021
+     // raptoronabicycle@gmail.com
+     //
+     // Experimental frequency hopping support:
+     // Here be dragons!
+     //
+     ///////////////////////////////////////////////////
+
     #if (ENABLE_RF95_FHSS > 0)
     /// Table of usable frequency channel tables
-    float _frequencyChannelTable [NUM_FREQ_CHANNELS] = {903.0,
-                                             904.6,
-                                             906.2,
-                                             907.8,
-                                             909.4,
-                                             911.0,
-                                             912.6,
-                                             914.2,
-                                             923.3,
-                                             923.9,
-                                             924.5,
-                                             925.1,
-                                             925.7,
-                                             926.3,
-                                             926.9,
-                                             927.5};
+    float _frequencyChannelTable [NUM_FREQ_CHANNELS] =
+    {903.0, 904.6, 906.2, 907.8, 909.4, 911.0, 912.6, 914.2,
+     923.3, 923.9, 924.5, 925.1, 925.7, 926.3, 926.9, 927.5};
     #endif // ENABLE_RF95_FHSS
+    
+    #if (ENABLE_RF95_FHSS == 3)
+    uint8_t _randomChannelSequence [NUM_FREQ_CHANNELS] =
+    {8, 3, 11, 5, 15, 12, 9, 6, 0, 7, 4, 1, 10, 13, 2, 14};
+    #endif // ENABLE_RF95_FHSS
+
+    ///////////////////////////////////////////////////
+     //
+     // end of additions by Sophie Bernier
+     //
+     ///////////////////////////////////////////////////
 };
 
 /// @example rf95_client.pde

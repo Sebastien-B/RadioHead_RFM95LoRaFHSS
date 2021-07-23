@@ -145,7 +145,7 @@ bool RH_RF95::init()
     // No Sync Words in LORA mode.
     setModemConfig(Bw125Cr45Sf128); // Radio default
 //    setModemConfig(Bw125Cr48Sf4096); // slow and reliable?
-    setPreambleLength(8); // Default is 8
+    setPreambleLength(64); // Default is 8
     // An innocuous ISM frequency, same as RF22's
     setFrequency(434.0);
     // Lowish power
@@ -268,21 +268,7 @@ void RH_RF95::handleInterrupt()
     #if (ENABLE_RF95_FHSS == 1)
     if (irq_flags & RH_RF95_FHSS_CHANGE_CHANNEL)
     {
-        #if DEBUG_RFM95_FREQ_HOP
-        digitalWrite(DEBUG_RFM95_FREQ_HOP, HIGH);
-        #endif // DEBUG_RFM95_FREQ_HOP
-        #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
-	    Serial.println("F: ");
-        Serial.println(getFreqHoppingChannel(), DEC);
-        #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
-        float freqToSet = _frequencyChannelTable[random(0,NUM_FREQ_CHANNELS)];
-        #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
-        Serial.println(freqToSet);
-        #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
-        setFrequency(freqToSet);
-        #if DEBUG_RFM95_FREQ_HOP
-        digitalWrite(DEBUG_RFM95_FREQ_HOP, LOW);
-        #endif // DEBUG_RFM95_FREQ_HOP
+        setRandomFrequency();
     }
     #endif // ENABLE_RF95_FHSS
     
@@ -334,15 +320,40 @@ void RH_RF95::validateRxBuf()
 
 bool RH_RF95::available()
 {
+    bool channelActive = false;
+    uint32_t currentMillis;
     RH_MUTEX_LOCK(lock); // Multithreading support
     if (_mode == RHModeTx)
     {
     	RH_MUTEX_UNLOCK(lock);
-	return false;
+	    return false;
     }
+    #if (ENABLE_RF95_FHSS == 2)
+    for (uint8_t i = 0; i < NUM_FREQ_CHANNELS; i++)
+    {
+        setFrequency(_frequencyChannelTable[i]);
+        //Serial.print(i);
+        //Serial.print(':');
+        setModeIdle();
+        channelActive = !waitCAD();
+        currentMillis = millis();
+        // channelActive = isChannelActive();
+        //Serial.println(channelActive);
+        if (channelActive)
+        {
+            Serial.println(i);
+            setModeRx();
+            RH_MUTEX_UNLOCK(lock);
+            return _rxBufValid; // Will be set by the interrupt handler when a good message is received
+        }
+    }
+    RH_MUTEX_UNLOCK(lock);
+    return false;
+    #else // ENABLE_RF95_FHSS
     setModeRx();
     RH_MUTEX_UNLOCK(lock);
     return _rxBufValid; // Will be set by the interrupt handler when a good message is received
+    #endif // ENABLE_RF95_FHSS
 }
 
 void RH_RF95::clearRxBuf()
@@ -400,6 +411,10 @@ bool RH_RF95::send(const uint8_t* data, uint8_t len)
     waitPacketSent(); // Make sure we dont interrupt an outgoing message
     setModeIdle();
 
+    #if (ENABLE_RF95_FHSS == 2)
+    setRandomFrequency();
+    #endif // ENABLE_RF95_FHSS
+
     if (!waitCAD())
     {
 	    #if DEBUG_RFM95_SEND
@@ -407,6 +422,7 @@ bool RH_RF95::send(const uint8_t* data, uint8_t len)
         #endif // DEBUG_RFM95_SEND
         return false;  // Check channel activity
     }
+
     // Position at the beginning of the FIFO
     spiWrite(RH_RF95_REG_0D_FIFO_ADDR_PTR, 0);
     // The headers
@@ -781,6 +797,40 @@ uint8_t RH_RF95::getDeviceVersion()
 	return _deviceVersion;
 }
 
+///////////////////////////////////////////////////
+ //
+ // additions below by Sophie Bernier 22nd Jul 2021
+ // raptoronabicycle@gmail.com
+ //
+ // Experimental frequency hopping support:
+ // Here be dragons!
+ //
+ ///////////////////////////////////////////////////
+
+#if (ENABLE_RF95_FHSS > 0)
+void RH_RF95::setRandomFrequency()
+{
+    #if DEBUG_RFM95_FREQ_HOP
+    digitalWrite(DEBUG_RFM95_FREQ_HOP, HIGH);
+    #endif // DEBUG_RFM95_FREQ_HOP
+    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+	Serial.println("F: ");
+    #if (ENABLE_RF95_FHSS == 1)
+    Serial.println(getFreqHoppingChannel(), DEC);
+    #endif // ENABLE_RF95_FHSS
+    #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    float freqToSet = _frequencyChannelTable[random(0,NUM_FREQ_CHANNELS)];
+    #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    Serial.println(freqToSet);
+    #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    setFrequency(freqToSet);
+    setModeIdle();
+    #if DEBUG_RFM95_FREQ_HOP
+    digitalWrite(DEBUG_RFM95_FREQ_HOP, LOW);
+    #endif // DEBUG_RFM95_FREQ_HOP
+}
+#endif // ENABLE_RF95_FHSS
+
 #if (ENABLE_RF95_FHSS == 1)
 void RH_RF95::setFreqHoppingPeriod(uint8_t period)
 {
@@ -796,4 +846,46 @@ uint8_t RH_RF95::getFreqHoppingChannel()
 {
     return (spiRead(RH_RF95_REG_1C_HOP_CHANNEL) & RH_RF95_FHSS_PRESENT_CHANNEL);
 }
+#endif // ENABLE_RF95_FHSS
+
+#if (ENABLE_RF95_FHSS == 3)
+// Advance through a repeating, randomized, 16-channel sequence.
+void RH_RF95::advanceFrequencySequence(bool reset, uint32_t timeout)
+{
+    static uint32_t currentMillis;
+    static uint32_t freqChangeMillis;
+    static uint8_t i;
+
+    if (reset)
+    {
+        i = 0;
+    }
+    currentMillis = millis();
+    if (((currentMillis - freqChangeMillis) > timeout) || reset)
+    {
+        freqChangeMillis = currentMillis;
+        #if DEBUG_RFM95_FREQ_HOP
+        digitalWrite(DEBUG_RFM95_FREQ_HOP, HIGH);
+        #endif // DEBUG_RFM95_FREQ_HOP
+        #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+	    Serial.println("F: ");
+        #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+        float freqToSet = _frequencyChannelTable[_randomChannelSequence[i]];
+        i++;
+        if (i >= NUM_FREQ_CHANNELS)
+        {
+            i = 0;
+        }
+        #if DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+        Serial.println(freqToSet);
+        #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+        setFrequency(freqToSet);
+        setModeIdle();
+        #if DEBUG_RFM95_FREQ_HOP
+        digitalWrite(DEBUG_RFM95_FREQ_HOP, LOW);
+        #endif // DEBUG_RFM95_FREQ_HOP
+    }
+}
+
+
 #endif // ENABLE_RF95_FHSS
