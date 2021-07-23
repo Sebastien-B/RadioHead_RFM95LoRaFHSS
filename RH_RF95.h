@@ -12,6 +12,8 @@
 #ifndef RH_RF95_h
 #define RH_RF95_h
 
+#include <RHSPIDriver.h>
+
 ///////////////////////////////////////////////////
  //
  // additions below by Sophie Bernier 22nd Jul 2021
@@ -51,9 +53,9 @@
 // unit will hear at least one, or reserve one frequency for joining.
 // In practice, recieving and transmitting must be precisely synchronized for
 // this approach to work - though it seems simple in theory.
-#define ENABLE_RF95_FHSS 3
+#define ENABLE_RF95_FHSS 0
 
-#define DEBUG_RF95_ENABLE_PRINT_STATEMENTS true
+#define DEBUG_RF95_ENABLE_PRINT_STATEMENTS false
 #define DEBUG_ENABLE_DEBUG_GPIO            true
 // Suitable pins for use with Adafruit Feather RFM95.
 #define DEBUG_GPIO_1 14
@@ -92,14 +94,6 @@
 #endif // DEBUG_RFM95_FREQ_HOP
 #endif // ENABLE_RF95_FHSS
 
-///////////////////////////////////////////////////
- //
- // end of additions by Sophie Bernier
- //
- ///////////////////////////////////////////////////
-
-#include <RHSPIDriver.h>
-
 #if (ENABLE_RF95_FHSS > 0)
 // Pseudo-random RNG seed used to generate channel hopping sequence
 // Should be the same across all units using FHSS operation.
@@ -108,6 +102,12 @@
 // Number of available frequency channels.
 #define NUM_FREQ_CHANNELS 16
 #endif // ENABLE_RF95_FHSS
+
+///////////////////////////////////////////////////
+ //
+ // end of additions by Sophie Bernier
+ //
+ ///////////////////////////////////////////////////
 
 // This is the maximum number of interrupts the driver can support
 // Most Arduinos can handle 2, Megas can handle more
