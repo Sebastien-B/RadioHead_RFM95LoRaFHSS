@@ -42,6 +42,10 @@ RH_RF95::RH_RF95(uint8_t slaveSelectPin, uint8_t interruptPin, RHGenericSPI& spi
 
 bool RH_RF95::init()
 {
+    #if (ENABLE_RF95_FHSS > 0)
+    randomSeed(RH_RF95_FHSS_SEED); // Initialize random freq hopping
+    #endif (ENABLE_RF95_FHSS > 0)
+
     #if DEBUG_ENABLE_DEBUG_GPIO
     pinMode(DEBUG_GPIO_1, OUTPUT);
     pinMode(DEBUG_GPIO_2, OUTPUT);
@@ -261,6 +265,7 @@ void RH_RF95::handleInterrupt()
     #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
     }
 
+    #if (ENABLE_RF95_FHSS == 1)
     if (irq_flags & RH_RF95_FHSS_CHANGE_CHANNEL)
     {
         #if DEBUG_RFM95_FREQ_HOP
@@ -279,6 +284,7 @@ void RH_RF95::handleInterrupt()
         digitalWrite(DEBUG_RFM95_FREQ_HOP, LOW);
         #endif // DEBUG_RFM95_FREQ_HOP
     }
+    #endif // ENABLE_RF95_FHSS
     
 	
     // Sigh: on some processors, for some unknown reason, doing this only once does not actually
@@ -775,6 +781,7 @@ uint8_t RH_RF95::getDeviceVersion()
 	return _deviceVersion;
 }
 
+#if (ENABLE_RF95_FHSS == 1)
 void RH_RF95::setFreqHoppingPeriod(uint8_t period)
 {
     if (period != 0)
@@ -789,3 +796,4 @@ uint8_t RH_RF95::getFreqHoppingChannel()
 {
     return (spiRead(RH_RF95_REG_1C_HOP_CHANNEL) & RH_RF95_FHSS_PRESENT_CHANNEL);
 }
+#endif // ENABLE_RF95_FHSS

@@ -12,6 +12,17 @@
 #ifndef RH_RF95_h
 #define RH_RF95_h
 
+// Values:
+// 0. FHSS Disabled.
+// 1. Basic FHSS support: Whenever the interrupts service
+// routine is called, which is usually when a message
+// finishes transmitting and when a message finishes receiving
+// we check the interrupt request flags for the frequency
+// hopping change channel flag.  If this flag is set, we
+// generate a pseudo random number from a fixed seed, serving as
+// the index to the table of frequencies available.
+#define ENABLE_RF95_FHSS 1
+
 #define DEBUG_RF95_ENABLE_PRINT_STATEMENTS false
 #define DEBUG_ENABLE_DEBUG_GPIO            true
 // Suitable pins for use with Adafruit Feather RFM95.
@@ -39,6 +50,7 @@
 #error "Invalid setting for DEBUG_RFM95_RECV."
 #endif // DEBUG_RFM95_RECV
 
+#if (ENABLE_RF95_FHSS == 1)
 // Sets the provided GPIO pin high when the RH_RF95_FHSS_CHANGE_CHANNEL IRQ flag is being serviced.
 // Set to debug GPIO to enable, 0 to disable.
 #define DEBUG_RFM95_FREQ_HOP DEBUG_GPIO_3
@@ -48,15 +60,18 @@
          || DEBUG_RFM95_FREQ_HOP == DEBUG_GPIO_3)
 #error "Invalid setting for DEBUG_RFM95_FREQ_HOP."
 #endif // DEBUG_RFM95_FREQ_HOP
+#endif // ENABLE_RF95_FHSS
 
 #include <RHSPIDriver.h>
 
+#if (ENABLE_RF95_FHSS > 0)
 // Pseudo-random RNG seed used to generate channel hopping sequence
 // Should be the same across all units using FHSS operation.
 #define RH_RF95_FHSS_SEED 380
 
 // Number of available frequency channels.
 #define NUM_FREQ_CHANNELS 16
+#endif // ENABLE_RF95_FHSS
 
 // This is the maximum number of interrupts the driver can support
 // Most Arduinos can handle 2, Megas can handle more
@@ -893,6 +908,7 @@ public:
     /// \return uint8_t deviceID
     uint8_t getDeviceVersion();
 
+    #if (ENABLE_RF95_FHSS == 1)
 	// Enable frequency hopping spread spectrum mode and set the number of symbol period between hops.
 	// Setting period to 0 disables frequency hopping.
 	// Call this immediately after init(). 
@@ -900,6 +916,7 @@ public:
 
 	// Get the current value of the frequency hopping channel in use.
 	uint8_t getFreqHoppingChannel();
+    #endif // ENABLE_RF95_FHSS
     
 protected:
     /// This is a low level function to handle the interrupts for one instance of RH_RF95.
@@ -967,6 +984,7 @@ private:
     /// device ID
     uint8_t		_deviceVersion = 0x00;
 
+    #if (ENABLE_RF95_FHSS > 0)
     /// Table of usable frequency channel tables
     float _frequencyChannelTable [NUM_FREQ_CHANNELS] = {903.0,
                                              904.6,
@@ -984,6 +1002,7 @@ private:
                                              926.3,
                                              926.9,
                                              927.5};
+    #endif // ENABLE_RF95_FHSS
 };
 
 /// @example rf95_client.pde
