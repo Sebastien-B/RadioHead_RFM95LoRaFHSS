@@ -254,9 +254,9 @@ void RH_RF95::handleInterrupt()
     {
     #if (DEBUG_RF95_ENABLE_PRINT_STATEMENTS > 1)
 	Serial.println("C");
-        _cad = irq_flags & RH_RF95_CAD_DETECTED;
-        setModeIdle();
     #endif // DEBUG_RF95_ENABLE_PRINT_STATEMENTS
+    _cad = irq_flags & RH_RF95_CAD_DETECTED;
+    setModeIdle();
     }
     else
     {
@@ -332,10 +332,11 @@ bool RH_RF95::available()
     for (uint8_t i = 0; i < NUM_FREQ_CHANNELS; i++)
     {
         setFrequency(_frequencyChannelTable[i]);
-        //Serial.print(i);
+        Serial.println(i);
         //Serial.print(':');
-        setModeIdle();
-        channelActive = !waitCAD();
+        //setModeIdle();
+        //channelActive = !waitCAD();
+        channelActive = waitForCAD();
         currentMillis = millis();
         // channelActive = isChannelActive();
         //Serial.println(channelActive);
@@ -343,8 +344,14 @@ bool RH_RF95::available()
         {
             Serial.println(i);
             setModeRx();
-            RH_MUTEX_UNLOCK(lock);
-            return _rxBufValid; // Will be set by the interrupt handler when a good message is received
+            while ((millis() - currentMillis) < 1000);
+            {
+                if (_rxBufValid)
+                {
+                    RH_MUTEX_UNLOCK(lock);
+                    return _rxBufValid;
+                }
+            }
         }
     }
     RH_MUTEX_UNLOCK(lock);
@@ -845,6 +852,39 @@ void RH_RF95::setFreqHoppingPeriod(uint8_t period)
 uint8_t RH_RF95::getFreqHoppingChannel()
 {
     return (spiRead(RH_RF95_REG_1C_HOP_CHANNEL) & RH_RF95_FHSS_PRESENT_CHANNEL);
+}
+#endif // ENABLE_RF95_FHSS
+
+#if (ENABLE_RF95_FHSS == 2)
+// Wait until channel activity detected or timeout
+bool RH_RF95::waitForCAD()
+{
+    if (!_wfr_cad_timeout)
+	return isChannelActive();
+
+    // Wait for any channel activity to finish or timeout
+    // Sophisticated DCF function...
+    // DCF : BackoffTime = random() x aSlotTime
+    // 100 - 1000 ms
+    // 10 sec timeout
+    unsigned long t = millis();
+    while (!isChannelActive())
+    {
+         if (millis() - t > _wfr_cad_timeout) 
+	     return false;
+#if (RH_PLATFORM == RH_PLATFORM_STM32) // stdlib on STMF103 gets confused if random is redefined
+	 //delay(_random(1, 10));
+#else
+         //delay(random(1, 10)); // Should these values be configurable? Macros?
+#endif
+    }
+
+    return true;
+}
+
+void RH_RF95::setWfrCADTimeout(unsigned long wfr_cad_timeout)
+{
+    _wfr_cad_timeout = wfr_cad_timeout;
 }
 #endif // ENABLE_RF95_FHSS
 

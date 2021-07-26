@@ -53,7 +53,7 @@
 // unit will hear at least one, or reserve one frequency for joining.
 // In practice, recieving and transmitting must be precisely synchronized for
 // this approach to work - though it seems simple in theory.
-#define ENABLE_RF95_FHSS 3
+#define ENABLE_RF95_FHSS 0
 
 // 1. Print on frequency change only.
 // >1. Print all.
@@ -84,8 +84,8 @@
 #error "Invalid setting for DEBUG_RFM95_RECV."
 #endif // DEBUG_RFM95_RECV
 
-#if (ENABLE_RF95_FHSS == 1)
-// Sets the provided GPIO pin high when the RH_RF95_FHSS_CHANGE_CHANNEL IRQ flag is being serviced.
+#if (ENABLE_RF95_FHSS > 0)
+// Sets the provided GPIO pin high when the frequency hop is occurring.
 // Set to debug GPIO to enable, 0 to disable.
 #define DEBUG_RFM95_FREQ_HOP DEBUG_GPIO_3
 #if DEBUG_RFM95_FREQ_HOP \
@@ -971,8 +971,30 @@ public:
 	uint8_t getFreqHoppingChannel();
     #endif // ENABLE_RF95_FHSS
 
+    #if (ENABLE_RF95_FHSS == 2)
+    /// Channel Activity Detection (CAD).
+    /// Blocks until channel activity is detected or wait-for-CAD timeout occurs.
+    /// Uses the radio's CAD function (if supported) to detect channel activity.
+    /// Implements random delays of 1 to 10ms while activity is not detected and until timeout.
+    /// Caution: the random() function is not seeded. If you want non-deterministic behaviour, consider
+    /// using something like randomSeed(analogRead(A0)); in your sketch.
+    /// Permits the implementation of listen-before-talk mechanism (Collision Avoidance).
+    /// Calls the isChannelActive() member function for the radio (if supported) 
+    /// to determine if the channel is active. If the radio does not support isChannelActive(),
+    /// always returns true immediately
+    /// \return true if the radio-specific CAD (as returned by isChannelActive())
+    /// shows the channel is clear within the timeout period (or the timeout period is 0), else returns false.
+    bool waitForCAD();
+
+    /// Sets the Channel Activity Detection timeout in milliseconds to be used by waitForCAD().
+    /// The default is 0, which means do not wait for CAD detection.
+    /// CAD detection depends on support for isChannelActive() by your particular radio.
+    void setWfrCADTimeout(unsigned long wfr_cad_timeout);
+    #endif // ENABLE_RF95_FHSS
+
     #if (ENABLE_RF95_FHSS == 3)
-    // Advance through a repeating, randomized, 16-channel sequence.
+    /// Advance through a repeating, randomized, 16-channel sequence.
+    /// \return true to indicate when it changes frquency, and false otherwise.
     bool advanceFrequencySequence(bool reset, uint32_t timeout);
     #endif // ENABLE_RF95_FHSS
     
@@ -1063,6 +1085,11 @@ private:
     float _frequencyChannelTable [NUM_FREQ_CHANNELS] =
     {903.0, 904.6, 906.2, 907.8, 909.4, 911.0, 912.6, 914.2,
      923.3, 923.9, 924.5, 925.1, 925.7, 926.3, 926.9, 927.5};
+    #endif // ENABLE_RF95_FHSS
+
+    #if (ENABLE_RF95_FHSS == 2)
+    /// Channel activity timeout in ms
+    unsigned int        _wfr_cad_timeout = 10;
     #endif // ENABLE_RF95_FHSS
     
     #if (ENABLE_RF95_FHSS == 3)
