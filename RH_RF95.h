@@ -57,8 +57,10 @@
 
 // 1. Print on frequency change only.
 // >1. Print all.
-#define DEBUG_RF95_ENABLE_PRINT_STATEMENTS 1
-#define DEBUG_ENABLE_DEBUG_GPIO            true
+// 0. Disabled.
+#define DEBUG_RF95_ENABLE_PRINT_STATEMENTS 0
+// When true, enables toggling debug GPIO pins for use with logic analyzers.
+#define DEBUG_ENABLE_DEBUG_GPIO            false
 // Suitable pins for use with Adafruit Feather RFM95.
 #define DEBUG_GPIO_1 14
 #define DEBUG_GPIO_2 15
